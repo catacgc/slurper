@@ -4,3 +4,5 @@
 tmp
 pkg
 *.gem
+slurper_config.yml
+stories.slurper

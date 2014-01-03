@@ -1,47 +1,48 @@
-require 'active_resource'
+# Simple value object for a story
+# It's only concern is to store and format yaml data from stories
+class YamlStory
 
-class Story < ActiveResource::Base
+  attr_reader :name, :story_type, :requested_by
 
-  def self.yaml
-    YAML.load_file('slurper_config.yml')
+  def initialize(attributes = {}, defaults = {})
+    # delete empty values (otherwise the default_proc bellow won't be called)
+    attributes.delete_if { |key, val| val == '' }
+
+    attributes.default_proc = proc do |hash, key|
+        defaults[key]
+      end
+
+    @name = attributes['name']
+    @description = attributes['description']
+    @story_type = attributes['story_type']
+    @labels = attributes['labels']
+    @requested_by = attributes['requested_by']
   end
 
-  def self.config
-    @@config = yaml
-    scheme =  if !!@@config['ssl']
-                self.ssl_options = {  :verify_mode => OpenSSL::SSL::VERIFY_PEER,
-                                      :ca_file => File.join(File.dirname(__FILE__), "cacert.pem") }
-                "https"
-              else
-                "http"
-              end
-    self.site = "#{scheme}://www.pivotaltracker.com/services/v3/projects/#{@@config['project_id']}"
-    @@config
+  def labels
+    return [] if not @labels
+    @labels.split(',').map { |label| label.strip }
   end
 
+  def description
+    return nil if @description == nil || @description == ''
 
-  headers['X-TrackerToken'] = config.delete("token")
-
-  def prepare
-    scrub_description
-    default_requested_by
+    @description.gsub('  ', '').gsub(" \n", "\n")
   end
 
-  protected
-
-  def scrub_description
-    if respond_to?(:description)
-      self.description = description.gsub("  ", "").gsub(" \n", "\n")
-    end
-    if respond_to?(:description) && description == ""
-      self.attributes["description"] = nil
-    end
+  def yaml_description
+    return '' if @description == nil || @description == ''
+    return @description.gsub(/^/, '  ')
   end
 
-  def default_requested_by
-    if (!respond_to?(:requested_by) || requested_by == "") && Story.config["requested_by"]
-      self.attributes["requested_by"] = Story.config["requested_by"]
-    end
+  def to_yaml
+    return "==
+story_type: #{story_type}
+name: \"#{name.gsub('"', "'")}\"
+description:
+#{yaml_description}
+labels: #{labels.join(', ')}
+"
   end
 
 end
